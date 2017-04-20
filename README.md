@@ -2,6 +2,8 @@
 
 A native Android app for Jarvis is currently under development.
 
+![alt tag](https://raw.githubusercontent.com/Code4SierraLeone/SolveCholera-AI-App/master/app/src/main/demo.png)
+
 Meanwhile you can enjoy this:
 
 ### Pre-requisites
