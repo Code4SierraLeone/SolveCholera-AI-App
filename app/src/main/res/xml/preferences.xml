@@ -18,6 +18,6 @@
         android:key="Location"
         android:selectAllOnFocus="true"
         android:singleLine="true"
-        android:summary="Location"
-        android:title="Enter your Location" />
+        android:summary="@string/pref_location_summary"
+        android:title="@string/pref_location_title" />
 </PreferenceScreen>
