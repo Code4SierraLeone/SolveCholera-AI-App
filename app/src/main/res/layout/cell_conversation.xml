@@ -11,9 +11,6 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Les CardView agissent comme des FrameLayout,
-         pour avoir une organisation verticale nous devons
-         donc rajouter un LinearLayout -->
 
         <TextView
             android:id="@+id/textViewName"
@@ -21,11 +18,11 @@
             android:layout_height="wrap_content"
             android:background="?android:selectableItemBackground"
             android:padding="2dp"
-            tools:text="Paris"
+            tools:text="Freetown"
             android:fontFamily="sans-serif"
             android:textColor="#339"
             android:textSize="12sp"
-            android:textStyle="italic"
+            android:textStyle="normal"
             android:layout_marginBottom="0dp"/>
 
         <TextView
@@ -34,7 +31,7 @@
             android:layout_height="wrap_content"
             android:background="?android:selectableItemBackground"
             android:padding="6dp"
-            tools:text="Paris"
+            tools:text="Freetown"
             android:fontFamily="sans-serif"
             android:textColor="#333"
             android:textSize="18sp"
