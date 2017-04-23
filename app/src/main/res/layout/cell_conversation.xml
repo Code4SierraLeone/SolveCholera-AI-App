@@ -18,7 +18,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="0dp"
             android:background="?android:selectableItemBackground"
-            android:fontFamily="sans-serif"
+            android:fontFamily="roboto"
             android:padding="2dp"
             android:textColor="#339"
             android:textSize="12sp"

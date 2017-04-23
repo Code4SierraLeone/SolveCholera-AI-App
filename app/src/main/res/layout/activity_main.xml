@@ -15,7 +15,7 @@
         android:layout_marginBottom="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginRight="8dp"
-        android:elevation="6dp"
+        android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:srcCompat="@drawable/mic_ico" />
@@ -34,7 +34,7 @@
         android:layout_marginBottom="8dp" />
 
     <!--<android.support.v7.widget.RecyclerView-->
-        <!--android:id="@+id/recycler-ViewConversation"-->
+        <!--android:id="@+id/recyclerViewConversation"-->
         <!--android:layout_width="0dp"-->
         <!--android:layout_height="0dp"-->
         <!--android:layout_marginBottom="8dp"-->
