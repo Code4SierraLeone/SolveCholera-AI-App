@@ -73,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         // Setup progressbar
-        pBarWaitingJArvis = (ProgressBar) findViewById(R.id.pBarWaitingJArvis);
+//        pBarWaitingJArvis = (ProgressBar) findViewById(R.id.pBarWaitingJArvis);
 
         // Setup recyclerView
         recyclerViewConversation = (RecyclerView) findViewById(R.id.recyclerViewConversation);

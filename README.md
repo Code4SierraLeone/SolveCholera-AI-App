@@ -4,7 +4,24 @@ A native Android app for Jarvis is currently under development.
 
 ![alt tag](https://raw.githubusercontent.com/Code4SierraLeone/SolveCholera-AI-App/master/app/src/main/demo.png)
 
-Meanwhile you can enjoy this:
+# Installation
+As the app is not yet released in `Google Play Store`:
+- Tap on the file `Jarvis_v*.*.*.apk` to install it
+- Some phone will ask you to activate insecure sources as it is not an application from the `Play Store`
+- The app is installed !
+
+Please check that you have the `Jarvis-API` plugin.
+
+# Setup
+On first launch it will ask you for some parameters:
+- URL or IP -> Address of your computer running Jarvis
+- Jarvis-API port (`8080` by default)
+
+Then tap on the back arrow to go to the main interface.
+
+# Usage
+Tap on the mic to speak, and read or listen Jarvis answer. 
+Be sure that multimedia sound is not muted if you want audio playback.
 
 ### Pre-requisites
 
