@@ -28,12 +28,17 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.NetworkResponse;
 import com.android.volley.RequestQueue;
+import com.android.volley.TimeoutError;
 import com.android.volley.toolbox.Volley;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.Request;
 import com.android.volley.VolleyError;
 import com.android.volley.Response;
+import com.android.volley.ServerError;
+import com.android.volley.NoConnectionError;
+import com.android.volley.NetworkError;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -56,7 +61,10 @@ public class MainActivity extends AppCompatActivity {
 
     private String serverUrl;
     private String serverPort;
+    private String serverKey;
     private Boolean sttAtStart;
+    private Boolean muteRemoteJarvis;
+    private Boolean muteLocalJarvis;
     private String jarvisOrder;
 
     @Override
@@ -101,7 +109,10 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences SP = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
         serverUrl = SP.getString("serverUrl", "NA");
         serverPort = SP.getString("serverPort", "NA");
+        serverKey = SP.getString("serverKey", "");
         sttAtStart = SP.getBoolean("sttAtStart", false);
+        muteRemoteJarvis = SP.getBoolean("muteRemoteJarvis", false);
+        muteLocalJarvis = SP.getBoolean("muteLocalJarvis", false);
         if (serverUrl == "NA") {
             Intent i = new Intent(this, MyPreferencesActivity.class);
             startActivity(i);
@@ -120,6 +131,9 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences SP = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
         serverUrl = SP.getString("serverUrl", "NA");
         serverPort = SP.getString("serverPort", "NA");
+        serverKey = SP.getString("serverKey", "");
+        muteRemoteJarvis = SP.getBoolean("muteRemoteJarvis", false);
+        muteLocalJarvis = SP.getBoolean("muteLocalJarvis", false);
         // Add "http;//" if it is missing, test only the first 4 characters in case of secure address
         if (!serverUrl.substring(0, 4).equals("http")) {
             serverUrl = "http://" + serverUrl;
@@ -179,7 +193,8 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         final JSONObject jsonBody = new JSONObject();
                         jsonBody.put("order", jarvisOrder);
-                        Log.i("Jarvis", "jsonObject: " + jsonBody.toString());
+                        jsonBody.put("key", serverKey);
+                        jsonBody.put("mute", muteRemoteJarvis.toString());
 
                         // Request a string response from the provided URL.
                         // TODO - Change to JSONArrayRequest if Json-api change
@@ -187,7 +202,6 @@ public class MainActivity extends AppCompatActivity {
                                 new Response.Listener<String>() {
                                     @Override
                                     public void onResponse(String response) {
-                                        Log.i("Jarvis", "Server answer: " + response.toString());
                                         // Parse answer
                                         try {
                                             JSONArray jObject = new JSONArray(response);
@@ -198,10 +212,12 @@ public class MainActivity extends AppCompatActivity {
                                                 jarvisConversationList.add(0, new ConversationObject("Jarvis", c.getString("Jarvis")));
                                                 recyclerViewConversation.getAdapter().notifyItemInserted(0);
                                                 recyclerViewConversation.smoothScrollToPosition(0);
-                                                if (android.os.Build.VERSION.SDK_INT >= 21) {
-                                                    ttsEngine.speak(c.getString("Jarvis"), TextToSpeech.QUEUE_ADD, null, c.getString("Jarvis"));
-                                                } else {
-                                                    ttsEngine.speak(c.getString("Jarvis"), TextToSpeech.QUEUE_ADD, null);
+                                                if (!muteLocalJarvis) {
+                                                    if (android.os.Build.VERSION.SDK_INT >= 21) {
+                                                        ttsEngine.speak(c.getString("Jarvis"), TextToSpeech.QUEUE_ADD, null, c.getString("Jarvis"));
+                                                    } else {
+                                                        ttsEngine.speak(c.getString("Jarvis"), TextToSpeech.QUEUE_ADD, null);
+                                                    }
                                                 }
                                             }
 
@@ -217,13 +233,41 @@ public class MainActivity extends AppCompatActivity {
                                 }, new Response.ErrorListener() {
                             @Override
                             public void onErrorResponse(VolleyError error) {
-                                Log.e("VOLLEY", error.toString());
+                                String defaultMessage = new String(getString(R.string.volleyError));
+                                Log.e("Volley", error.toString());
+                                if (error instanceof ServerError) {
+                                    // Wrong port number
+                                    defaultMessage = getString(R.string.timeoutServerNetworkError);
+                                    Log.e("Jarvis-Volley", defaultMessage);
+                                } else if (error instanceof NetworkError || error instanceof TimeoutError) {
+                                    // Jarvis down or wrong address
+                                    defaultMessage = getString(R.string.timeoutServerNetworkError);
+                                    Log.e("Jarvis-Volley", defaultMessage );
+                                } else if (error instanceof NoConnectionError) {
+                                    defaultMessage = getString(R.string.timeoutServerNetworkError);
+                                    Log.e("Jarvis-Volley", defaultMessage);
+                                } else {
+                                    NetworkResponse response = error.networkResponse;
+                                    if(response != null && response.data != null){
+                                        switch(response.statusCode) {
+                                            case 400:
+                                                String json = new String(response.data);
+                                                if (json.contains("Invalid API Key")) {
+                                                    defaultMessage = getString(R.string.invalidAPIKey);
+                                                }
+                                                if (json.contains("Missing API Key") ||
+                                                        json.contains("Empty API Key")) {
+                                                    defaultMessage = getString(R.string.missingAPIKey);
+                                                }
+                                                break;
+                                        }
+                                    }
+                                }
                                 // TODO - Snackbar action button
                                 Snackbar snackbarVolleyError = Snackbar
-                                        .make(findViewById(R.id.mainActivity), R.string.volleyError, Snackbar.LENGTH_LONG);
+                                        .make(findViewById(R.id.mainActivity), defaultMessage, Snackbar.LENGTH_LONG);
 
                                 snackbarVolleyError.show();
-                                recyclerViewConversation.smoothScrollToPosition(0);
                             }
                         }){
                             @Override
