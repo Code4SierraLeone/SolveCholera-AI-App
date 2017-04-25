@@ -4,9 +4,13 @@ import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -20,6 +24,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.support.design.widget.FloatingActionButton;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -34,7 +39,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import android.util.Log;
-import java.net.URLEncoder;
 
 import android.speech.tts.TextToSpeech;
 
@@ -44,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
 
     private FloatingActionButton btnSpeak;
     private RecyclerView recyclerViewConversation;
+    private ProgressBar pBarWaitingJArvis;
     private List<ConversationObject> jarvisConversationList = new ArrayList<>();
     // TODO - Update alue
     private final int REQ_CODE_SPEECH_INPUT = 100;
@@ -51,18 +56,16 @@ public class MainActivity extends AppCompatActivity {
 
     private String serverUrl;
     private String serverPort;
+    private Boolean sttAtStart;
+    private String jarvisOrder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Get microphone button
-        btnSpeak = (FloatingActionButton) findViewById(R.id.btnSpeak);
-
-        // Setup toolbar
-        //Toolbar myToolbar = (Toolbar) findViewById(R.id.my_toolbar);
-        //setSupportActionBar(myToolbar);
+        // Setup progressbar
+        pBarWaitingJArvis = (ProgressBar) findViewById(R.id.pBarWaitingJArvis);
 
         // Setup recyclerView
         recyclerViewConversation = (RecyclerView) findViewById(R.id.recyclerViewConversation);
@@ -70,6 +73,8 @@ public class MainActivity extends AppCompatActivity {
         jarvisConversationList.add(new ConversationObject("", getString(R.string.tap_on_mic)));
         recyclerViewConversation.setAdapter(new ConversationAdapter(jarvisConversationList));
 
+        // Setup microphone button
+        btnSpeak = (FloatingActionButton) findViewById(R.id.btnSpeak);
         btnSpeak.setOnClickListener(new View.OnClickListener() {
 
             @Override
@@ -78,7 +83,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // jarvisConversation.setMovementMethod(new ScrollingMovementMethod());
 
         // Init TTS
         ttsEngine = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
@@ -87,6 +91,8 @@ public class MainActivity extends AppCompatActivity {
                 if(status != TextToSpeech.ERROR) {
                     // TODO - https://developer.android.com/reference/android/speech/tts/TextToSpeech.html#isLanguageAvailable(java.util.Locale)
                     ttsEngine.setLanguage(Locale.getDefault());
+                } else {
+                    Log.w("Jarvis", "TTS init failed");
                 }
             }
         });
@@ -95,9 +101,14 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences SP = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
         serverUrl = SP.getString("serverUrl", "NA");
         serverPort = SP.getString("serverPort", "NA");
+        sttAtStart = SP.getBoolean("sttAtStart", false);
         if (serverUrl == "NA") {
             Intent i = new Intent(this, MyPreferencesActivity.class);
             startActivity(i);
+        } else {
+            if (sttAtStart == true) {
+                promptSpeechInput();
+            }
         }
     }
 
@@ -109,6 +120,13 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences SP = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
         serverUrl = SP.getString("serverUrl", "NA");
         serverPort = SP.getString("serverPort", "NA");
+        // Add "http;//" if it is missing, test only the first 4 characters in case of secure address
+        if (!serverUrl.substring(0, 4).equals("http")) {
+            serverUrl = "http://" + serverUrl;
+            SharedPreferences.Editor editor = SP.edit();
+            editor.putString("serverUrl", serverUrl);
+            editor.commit();
+        }
     }
 
     /**
@@ -123,11 +141,15 @@ public class MainActivity extends AppCompatActivity {
                 getString(R.string.speech_prompt));
         try {
             startActivityForResult(intent, REQ_CODE_SPEECH_INPUT);
+            // Hide mic button, show progressbar
+            pBarWaitingJArvis.setVisibility(View.VISIBLE);
+            btnSpeak.setVisibility(View.INVISIBLE);
         } catch (ActivityNotFoundException a) {
             Toast.makeText(getApplicationContext(),
                     getString(R.string.speech_not_supported),
                     Toast.LENGTH_SHORT).show();
         }
+
     }
 
     /**
@@ -138,70 +160,99 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         switch (requestCode) {
-            case REQ_CODE_SPEECH_INPUT: {
+            case REQ_CODE_SPEECH_INPUT: { // Result from STT
                 if (resultCode == RESULT_OK && null != data) {
 
                     ArrayList<String> result = data
                             .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-                    jarvisConversationList.add(0, new ConversationObject("You", result.get(0)));
+                    jarvisOrder = result.get(0);
+                    jarvisConversationList.add(0, new ConversationObject("You", jarvisOrder));
                     recyclerViewConversation.getAdapter().notifyItemInserted(0);
                     recyclerViewConversation.smoothScrollToPosition(0);
-                    Log.i("Jarvis", "STT: " + result.get(0));
-
+                    Log.i("Jarvis", "STT: " + jarvisOrder);
 
                     // Instantiate the RequestQueue.
                     RequestQueue queue = Volley.newRequestQueue(this);
-                    String requestUrl = serverUrl+":"+serverPort+"/?order=" + URLEncoder.encode(result.get(0));
+                    String requestUrl = serverUrl+":"+serverPort + "/";
 
-                    // Request a string response from the provided URL.
-                    StringRequest stringRequest = new StringRequest(Request.Method.GET, requestUrl,
-                            new Response.Listener<String>() {
-                                @Override
-                                public void onResponse(String response) {
-                                    Log.i("Jarvis", "Server answer: " + response);
-                                    // Parse answer
-                                    try {
-                                        JSONArray jObject = new JSONArray(response);
-                                        Log.i("Jarvis", "jObject" + jObject.toString());
-                                        for (int i=0; i<jObject.length(); i++) {
-                                            JSONObject c = jObject.getJSONObject(i);
-                                            Log.i("Jarvis", "Answer: " + c.toString());
-                                            jarvisConversationList.add(0, new ConversationObject("Jarvis", c.getString("Jarvis")));
-                                            recyclerViewConversation.getAdapter().notifyItemInserted(0);
-                                            recyclerViewConversation.smoothScrollToPosition(0);
-                                            if (android.os.Build.VERSION.SDK_INT >= 21) {
-                                                ttsEngine.speak(c.getString("Jarvis"), TextToSpeech.QUEUE_ADD, null, c.getString("Jarvis"));
-                                            } else {
-                                                ttsEngine.speak(c.getString("Jarvis"), TextToSpeech.QUEUE_ADD, null);
+                    // Instantiate JSON object
+                    try {
+                        final JSONObject jsonBody = new JSONObject();
+                        jsonBody.put("order", jarvisOrder);
+                        Log.i("Jarvis", "jsonObject: " + jsonBody.toString());
+
+                        // Request a string response from the provided URL.
+                        // TODO - Change to JSONArrayRequest if Json-api change
+                        StringRequest stringRequest = new StringRequest(Request.Method.POST, requestUrl,
+                                new Response.Listener<String>() {
+                                    @Override
+                                    public void onResponse(String response) {
+                                        Log.i("Jarvis", "Server answer: " + response.toString());
+                                        // Parse answer
+                                        try {
+                                            JSONArray jObject = new JSONArray(response);
+                                            Log.i("Jarvis", "jObject" + jObject.toString());
+                                            for ( int i=0; i<jObject.length(); i++ ) {
+                                                JSONObject c = jObject.getJSONObject(i);
+                                                Log.i("Jarvis", "Answer: " + c.toString());
+                                                jarvisConversationList.add(0, new ConversationObject("Jarvis", c.getString("Jarvis")));
+                                                recyclerViewConversation.getAdapter().notifyItemInserted(0);
+                                                recyclerViewConversation.smoothScrollToPosition(0);
+                                                if (android.os.Build.VERSION.SDK_INT >= 21) {
+                                                    ttsEngine.speak(c.getString("Jarvis"), TextToSpeech.QUEUE_ADD, null, c.getString("Jarvis"));
+                                                } else {
+                                                    ttsEngine.speak(c.getString("Jarvis"), TextToSpeech.QUEUE_ADD, null);
+                                                }
                                             }
+
+                                        } catch (final JSONException e) {
+                                            Log.e("Main", "Json parsing error: " + e.getMessage());
+                                            Toast.makeText(getApplicationContext(),
+                                                    "Json parsing error: " + e.getMessage(),
+                                                    Toast.LENGTH_LONG)
+                                                    .show();
+
                                         }
-                                    } catch (final JSONException e) {
-                                        Log.e("Main", "Json parsing error: " + e.getMessage());
-                                        Toast.makeText(getApplicationContext(),
-                                                "Json parsing error: " + e.getMessage(),
-                                                Toast.LENGTH_LONG)
-                                                .show();
-
                                     }
-                                }
-                            }, new Response.ErrorListener() {
-                        @Override
-                        public void onErrorResponse(VolleyError error) {
-                            Log.e("VOLLEY", error.toString());
-                            // TODO - Snackbar action button
-                            Snackbar snackbarVolleyError = Snackbar
-                                    .make(findViewById(R.id.mainActivity), R.string.volleyError, Snackbar.LENGTH_LONG);
+                                }, new Response.ErrorListener() {
+                            @Override
+                            public void onErrorResponse(VolleyError error) {
+                                Log.e("VOLLEY", error.toString());
+                                // TODO - Snackbar action button
+                                Snackbar snackbarVolleyError = Snackbar
+                                        .make(findViewById(R.id.mainActivity), R.string.volleyError, Snackbar.LENGTH_LONG);
 
-                            snackbarVolleyError.show();
-                            recyclerViewConversation.smoothScrollToPosition(0);
-                        }
-                    });
-                    // Add the request to the RequestQueue.
-                    queue.add(stringRequest);
+                                snackbarVolleyError.show();
+                                recyclerViewConversation.smoothScrollToPosition(0);
+                            }
+                        }){
+                            @Override
+                            public byte[] getBody() {
+                                try {
+                                    return jsonBody.toString().getBytes("utf-8");
+                                } catch (UnsupportedEncodingException uee) {
+                                    Log.e("Jarvis", "Unsupported Encoding while trying to get the bytes of "+jsonBody.toString()+" using utf-8");
+                                    return null;
+                                }
+                            }
+                            @Override
+                            public Map<String, String> getHeaders() {
+                                Map<String,String> params = new HashMap<String, String>();
+                                params.put("Content-Type","application/json; charset=utf-8");
+                                return params;
+                            }
+                        };
+                        // Add the request to the RequestQueue.
+                        queue.add(stringRequest);
+                    } catch (final JSONException e) {
+                        Log.e("Jarvis", e.toString());
+                    }
                 }
+                // Hide progressBar show mic button.
+                btnSpeak.setVisibility(View.VISIBLE);
+                pBarWaitingJArvis.setVisibility(View.INVISIBLE);
                 break;
             }
-
         }
     }
 
